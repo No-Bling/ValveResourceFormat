@@ -663,7 +663,7 @@ namespace Decompiler
                                 lock (ConsoleWriterLock)
                                 {
                                     Console.ForegroundColor = ConsoleColor.DarkRed;
-                                    Console.WriteLine("\t" + e.Message + " on resource type " + type + ", extracting as-is");
+                                    Console.WriteLine("\t{0} File Extension: '{1}' - extracting as-is", e.Message, type);
                                     Console.ResetColor();
                                 }
                                 DumpFile(filePath, output);
@@ -698,17 +698,52 @@ namespace Decompiler
                                         output = ms.ToArray();
                                     }
                                     break;
+
+                                case "vrman_c":
+                                    // TODO: missing DATA for non-NTRO ResourceManifest - generate vrman from RERL Block anyway
+                                    if (resource.ResourceType == ResourceType.ResourceManifest && resource.Blocks.ContainsKey(BlockType.RERL))
+                                    {
+                                        lock (ConsoleWriterLock)
+                                        {
+                                            Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                                            Console.WriteLine("\tMissing block 'NTRO' Resource Type: {0} [Version {1}] [Header Version: {2}]", resource.ResourceType, resource.Version, resource.HeaderVersion);
+                                            Console.ResetColor();
+                                        }
+                                        var rerl = resource.ExternalReferences.ResourceRefInfoList;
+                                        output = Encoding.UTF8.GetBytes(string.Join("\r\n", "ResourceManifest_t", "{",
+                                          string.Format("\tCResourceString m_ResourceFileNameList[{0}] =", rerl.Count), "\t[",
+                                          string.Join("\r\n", rerl.Select(res => string.Format("\t\t\"{0}\"", res.Name))),
+                                          "\t]", "}")); 
+                                        newType = "vrman";
+                                    }
+                                    else if (resource.ResourceType == ResourceType.ResourceManifest && resource.Blocks.ContainsKey(BlockType.NTRO)) 
+                                        output = Encoding.UTF8.GetBytes(resource.Blocks[BlockType.DATA].ToString()); // default NTRO ResourceManifest
+                                    break;
+                                case "vvis_c":
+                                    // TODO: Add proper vvis_c VXVS block handling (this is like hex-editing it to RERL and then assume DATA to be KV3) 
+                                    if (!resource.Blocks.ContainsKey(BlockType.NTRO) && resource.Blocks.ContainsKey(BlockType.RERL))
+                                    {
+                                        lock (ConsoleWriterLock)
+                                        {
+                                            Console.ForegroundColor = ConsoleColor.DarkRed;
+                                            Console.WriteLine("\tUnrecognized block 'VXVS' Resource Type: {0} [Version {1}] [Header Version: {2}]", resource.ResourceType, resource.Version, resource.HeaderVersion);
+                                            Console.ResetColor();
+                                        }
+                                    }
+                                    output = Encoding.UTF8.GetBytes(resource.Blocks[BlockType.DATA].ToString());
+                                    break;
+
                                 default:
                                     try
                                     {
                                         output = Encoding.UTF8.GetBytes(resource.Blocks[BlockType.DATA].ToString());
                                     }
-                                    catch (Exception)
+                                    catch (Exception e)
                                     {
                                         lock (ConsoleWriterLock)
                                         {
                                             Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                                            Console.WriteLine("\tDecompiler for resource type " + type + " not implemented, extracting as-is");
+                                            Console.WriteLine("\t{0} Resource Type: {1} [Version {2}] [Header Version: {3}] - extracting as-is", e.Message, resource.ResourceType, resource.Version, resource.HeaderVersion);
                                             Console.ResetColor();
                                         }
                                         output = memory.ToArray();
