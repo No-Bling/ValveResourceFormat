@@ -218,7 +218,19 @@ namespace ValveResourceFormat
                                 ResourceType = DetermineResourceTypeByCompilerIdentifier(specialDeps.List[0]);
                             }
                         }
-
+                        // TODO: Identify non-NTRO WorldVisibility
+                        if (ResourceType == ResourceType.Unknown && EditInfo.Structs.ContainsKey(ResourceEditInfo.REDIStruct.ArgumentDependencies))
+                        {
+                            var argumentDeps = (ArgumentDependencies)EditInfo.Structs[ResourceEditInfo.REDIStruct.ArgumentDependencies];
+                            if (argumentDeps.List.Count > 0)
+                            {
+                                foreach (var param in argumentDeps.List)
+                                {
+                                  if (param.ParameterName == "disablevis") ResourceType = ResourceType.WorldVisibility;
+                                }
+                            }
+                        }
+  
                         break;
 
                     case BlockType.NTRO:
@@ -261,6 +273,10 @@ namespace ValveResourceFormat
 
                 case "VBIB":
                     return new VBIB();
+
+                // TODO: Add proper VXVS block handling (this is like hex-editing it to RERL and then assume DATA to be KV3)
+                case "VXVS":
+                    return new ResourceExtRefList();
             }
 
             throw new ArgumentException(string.Format("Unrecognized block type '{0}'", input));
@@ -296,8 +312,15 @@ namespace ValveResourceFormat
                     {
                         break;
                     }
-
                     return new BinaryKV3();
+
+                // TODO: Add proper VXVS block handling (this is like hex-editing it to RERL and then assume DATA to be KV3)
+                case ResourceType.WorldVisibility:
+                    if (!Blocks.ContainsKey(BlockType.NTRO))
+                    {
+                        return new BinaryKV3();
+                    }
+                    break;
             }
 
             if (Blocks.ContainsKey(BlockType.NTRO))
